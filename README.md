@@ -1,145 +1,206 @@
-# CPC Prediction Project
+# Electricity Consumption Forecasting
 
-This project forecasts monthly electricity consumption (CPC) for 13 provinces in Vietnam using historical electricity consumption data.
+> **Note:** This repository was revised from an internal project at a previous company (CADS - FPT) and cleaned for portfolio sharing. The demo uses synthetic data for illustration only; real electricity consumption data is not included.
 
-> **Note:** This repository is revised from original internal project code from a previous company in 2023.
-> Private information, internal infrastructure paths, and confidential business details have been removed.
-> This demo does not use real electricity consumption data; it is generated for demonstration purposes only.
->
-It supports two forecasting modes:
+## Highlights
 
-- **T+1 Forecasting**: predict electricity consumption for the next month.
-- **T+12 Forecasting**: predict electricity consumption for the next 12 months.
+- **13 provinces** across Central Vietnam — province-level monthly electricity consumption forecasting
+- **< 6% MAPE** across all 13 provinces; **< 4% MAPE** for 6 of 13 — evaluated over 18 months
+- **Decomposition-based approach** — trend (linear), seasonality (statistical model), and residual (ARIMA) modeled independently then combined
+- **Per-month parameter tuning** — each calendar month uses an independently optimized parameter set (lag, order1, order2, shift)
+- **Dual forecast horizons** — next-month (T+1) and recursive 12-month (T+12) predictions
+- **Breakdown forecasting** — sub-series analysis by district and industry sector validated against total-consumption baseline
 
 ---
 
 ## Demo
 
-A quick demo is included to illustrate the forecasting pipeline using synthetic historical data. This demo does not use real electricity consumption data; it is generated for demonstration purposes only. The demo generates predicted values for each forecast component:
+![Forecast sample](docs/forecast_sample.png)
 
-- `trend` — long-term trend forecast
-- `season` — seasonal pattern forecast
-- `resid` — residual forecast
-- `y_pr` — combined final prediction
-
-It also saves visualizations of the forecast results.
-
-Run the demo with:
+A self-contained demo (`demo_prediction.py`) illustrates the full pipeline using synthetic data:
 
 ```bash
 python3 demo_prediction.py
 ```
 
-The demo produces the following files in `docs/`:
+The demo generates component-level forecasts and saves:
 
-- `docs/demo_forecast_next_month.csv` — T+1 forecast with component breakdown and final prediction
-- `docs/demo_forecast_12_months.csv` — recursive T+12 forecast with component breakdown and final prediction
-- `docs/forecast_sample.png` — combined sample plot showing history and predicted values for example provinces
-- `docs/forecast_<province>.png` — individual province plots
-- `docs/forecast_BDINH.png` — BDINH province history and total forecast plot
-- `docs/forecast_BDINH_total.png` — BDINH total forecast vs historical consumption
-- `docs/forecast_BDINH_components.png` — BDINH component forecast showing trend, seasonal, and residual predictions
-- `docs/forecast_BDINH_components_three_plots.png` — BDINH component forecasts in three separate charts
+| Output | Description |
+|---|---|
+| `docs/demo_forecast_next_month.csv` | T+1 forecast with trend, seasonal, residual, and final prediction |
+| `docs/demo_forecast_12_months.csv` | Recursive T+12 forecast with component breakdown |
+| `docs/forecast_sample.png` | Combined plot — history + predictions for example provinces |
+| `docs/forecast_<province>.png` | Individual province-level forecast plots |
 
-![Forecast sample](docs/forecast_sample.png)
+### Forecast Decomposition — BDINH Province
 
-#### BDINH component forecast
+The model separates each province's consumption into three interpretable components:
+
+**Total forecast vs. historical:**
 
 ![BDINH total forecast](docs/forecast_BDINH_total.png)
 
-![BDINH components three plots](docs/forecast_BDINH_components_three_plots.png)
+**Component breakdown (trend + seasonal + residual):**
 
-This specific BDINH demo visualizes:
-
-- the historical BDINH series and total forecast
-- the forecasted trend, seasonal, and residual components separately
-- a dedicated BDINH province forecast plot
-- the component predictions shown as three separate charts for clarity
+![BDINH components](docs/forecast_BDINH_components_three_plots.png)
 
 ---
 
-## Project Overview
+## Results
 
-The goal of this project is to forecast monthly electricity consumption at province level using historical data from 2014 onward.
+*Evaluation period: January 2022 – July 2023 (18 months) · 13 provinces · Data from 2014–2023*
 
-The core forecasting method is based on time-series decomposition. Each monthly consumption series is decomposed into three components:
+### Overall Performance
 
-1. **Trend**
-2. **Seasonality**
-3. **Residual**
-
-Each component is predicted using a dedicated model, then combined to produce the final forecast.
-
-```text
-Final Prediction = Trend Prediction + Seasonal Prediction + Residual Prediction
-```
-
----
-
-## Forecasting Method
-
-### 1. Trend Prediction
-
-The trend component captures the long-term movement of electricity consumption.
-
-A **linear model** is used to forecast the trend component. This helps the forecast follow the general growth, decline, or stable movement of each province's consumption pattern.
-
-### 2. Seasonal Prediction
-
-The seasonal component captures repeated monthly and yearly consumption behavior.
-
-A **statistical model** is used to forecast seasonality. The model uses historical electricity consumption and cumulative consumption patterns.
-
-The statistical model is controlled by several parameters:
-
-| Parameter | Description |
+| Metric | Result |
 |---|---|
-| `lag` | Number of historical months used for estimation |
-| `order1` | Function order used to estimate monthly consumption |
-| `order2` | Function order used to estimate cumulative consumption |
-| `shift` | Number of steps to shift historical data backward |
+| **Primary metric** | MAPE (Mean Absolute Percentage Error) |
+| **All 13 provinces** | Average MAPE **< 6%** |
+| **6 of 13 provinces** | Average MAPE **< 4%** |
+| **3 provinces** | Near the 6% threshold (DANANG 5.8%, DNONG 5.4%, QNGAI 5.5%) |
 
-A parameter set is selected for each month from January to December.
+### Performance Groups
 
-### 3. Residual Prediction
+Provinces fell into two groups based on error stability:
 
-The residual component represents the remaining variation after removing trend and seasonality.
+| Group | Provinces | Characteristics | Action |
+|---|---|---|---|
+| **Group 1** | BINHDINH, GIALAI, KHANHHOA, KOMTUM, PHUYEN, QUANGNAM, QUANGBINH, QUANGTRI, TTHUE | Stable, low error (1.7–4.6% mean absolute error) | Monitor |
+| **Group 2** | DANANG, DAKLAK, DAKNONG, QUANGNGAI | Higher variance, less stable (5.1–6.4% mean) | Active treatment |
 
-An **ARIMA model** is used to forecast the residual component. This helps capture short-term patterns that are not explained by the trend or seasonal model.
 
-### 4. Multi-Month Forecasting
+### Sub-Series Breakdown Analysis
 
-For forecasts beyond one month, the project uses a **recursive strategy**.
+Beyond total-consumption forecasting, the model was evaluated on decomposed sub-series:
 
-The model first predicts `T+1`, then uses that prediction as part of the input to predict the next step.
+**By Industry Sector (NN_LV1):**
 
-```text
-Predict T+1 -> update input -> predict T+2 -> update input -> ... -> predict T+12
+| Sector | Performance |
+|---|---|
+| Residential (Sinh hoạt dân dụng) | **Best** — 2.5–8.9% MAPE, stable |
+| Other activities | **Good** — low and stable error |
+| Industry & Construction | Moderate — mostly <10% (except DLAK, DNONG) |
+| Agriculture, Forestry, Fishery | **High** — 15–20% MAPE, volatile (esp. Central Highlands) |
+| Commerce, Hotels, Restaurants | **Highest** — 15–20%+, most volatile across all provinces |
+
+**By District (DVDC_LV3):**
+
+- **~65%** of district-level sub-series achieved **< 10% MAPE**
+- Total-consumption forecasting vs. sum-of-sub-series forecasting produced comparable results — validating the decomposition approach
+- District-level breakdown was selected as the preferred direction for deployment due to more uniform error distribution
+
+### T+12 Recursive Forecasting
+
+*Evaluation period: December 2022 – July 2023 (8 months)*
+
+- T+1 error: **~6%** → T+12 error: **~14%**
+- Error increases gradually with horizon distance — expected for recursive strategy
+- Four strategies evaluated: Recursive, Multi-output, Direct, DirRec — **Recursive** chosen for simplicity and acceptable error propagation
+
+---
+
+## Problem & Approach
+
+**Goal:** Forecast monthly electricity consumption at the province level for 13 Central Vietnam provinces using historical data from 2014 onward.
+
+**Client:** CPC (Central Power Corporation) — a major regional electricity utility
+
+### Core Idea: Decomposition Forecasting
+
+Each province's monthly consumption series is decomposed into three independent components, forecast separately, then recombined:
+
+```
+Final Prediction = Trend Forecast + Seasonal Forecast + Residual Forecast
 ```
 
-This allows the one-step forecasting logic to be reused for longer forecast horizons. However, forecast error may increase for farther months because errors can propagate through recursive steps.
+| Component | What it captures | Model |
+|---|---|---|
+| **Trend** | Long-term growth, decline, or stability | Linear model |
+| **Seasonal** | Repeated monthly and yearly cycles | Statistical model with per-month parameters |
+| **Residual** | Short-term variation unexplained by trend or seasonality | ARIMA |
+
+### 1. Trend — Linear Model
+
+Captures the underlying direction of each province's consumption. Simple and robust — avoids overfitting to short-term noise.
+
+### 2. Seasonality — Statistical Model
+
+The most heavily engineered component. Uses historical consumption and cumulative consumption to estimate the next month's value. A key insight from the project: **cumulative consumption patterns are highly correlated across years (correlation ≈ 1)**, making cumulative forecasting a reliable anchor.
+
+Parameters tuned independently for each calendar month (January–December):
+
+| Parameter | Role |
+|---|---|
+| `lag` | Number of historical months used for estimation (range: 3–12) |
+| `order1` | Function order for monthly consumption estimation (max: 5) |
+| `order2` | Function order for cumulative consumption estimation |
+| `shift` | Steps to shift historical data backward (pattern matching) |
+
+Parameter selection: grid search over parameter space, selecting the combination with lowest MAPE on the training set (2014–2021). A critical finding: **identifying which past year's pattern the forecast year most resembles is more important than parameter tuning** — correlation-based year matching was used for provinces like DANANG.
+
+### 3. Residual — ARIMA
+
+Captures remaining short-term patterns after trend and seasonality are removed. Added in Version 4 of the pipeline — prior versions assumed residual = 0.
+
+### Recursive T+12 Forecasting
+
+For multi-month horizons, the model chains one-step predictions:
+
+```
+Predict T+1 → feed into input → predict T+2 → ... → predict T+12
+```
+
+Four strategies were evaluated (Recursive, Multi-output, Direct, DirRec). Recursive was selected — error propagation is acceptable (~6% → ~14% over 12 steps) and only one model needs to be maintained.
 
 ---
 
-## Results at Development Time
+## Quick Start
 
-The model was evaluated on monthly electricity consumption data for 13 provinces.
+```bash
+# Install dependencies
+pip install -r requirements.txt
 
-Main reported results:
+# Run the demo (synthetic data, no setup needed)
+python3 demo_prediction.py
+```
 
-- Evaluation period: **January 2022 to July 2023**
-- Metric: **MAPE**
-- Average MAPE below **6%** for all 13 provinces
-- Average MAPE below **4%** for 6 out of 13 provinces
-- January 2023 showed over-forecasting across all provinces
-- DNONG had the most unstable forecast error among the provinces
-- For long-horizon forecasting, error generally increased as the forecast horizon became farther
+### Running on real data
 
----
+```bash
+# T+1 forecast (next month)
+python main/forecast_t1_13pr_sum.py \
+  -f 01/2023 -t 03/2023 \
+  -p /path/to/params \
+  -i /path/to/input.parquet \
+  -o /path/to/output_t1.parquet
 
-## Achievement Summary
+# T+12 forecast (next 12 months)
+python main/forecast_t12_13pr_sum.py \
+  -f 01/2023 -t 03/2023 \
+  -p /path/to/params \
+  -i /path/to/input.parquet \
+  -o /path/to/output_t12.parquet
+```
 
-Developed a decomposition-based electricity consumption forecasting pipeline for 13 provinces. The method combines a linear model for trend prediction, a statistical parameter-based model for seasonal prediction, and ARIMA for residual prediction. It also supports recursive multi-step forecasting for T+12 prediction. At development time, the model achieved average MAPE below 6% across all 13 provinces, with 6 provinces below 4% MAPE.
+| Argument | Description |
+|---|---|
+| `-f` | Start month (`MM/YYYY`) |
+| `-t` | End month (`MM/YYYY`) |
+| `-p` | Parameter file for 13 provinces |
+| `-i` | Input electricity data (CSV or Parquet) |
+| `-o` | Output path for forecast results |
+
+### Input Data Format
+
+| Column | Description |
+|---|---|
+| `Date` | Observation month (`YYYY-MM-DD` recommended) |
+| `Province` | Province name |
+| `Consumption` | Electricity consumption value |
+
+### Output
+
+T+1 results include `Province`, `Year`, `Month`, `y_tr` (actual), and `y_pr` (predicted). T+12 results include columns `y_pr1` through `y_pr12` for each forecast horizon.
 
 ---
 
@@ -147,184 +208,25 @@ Developed a decomposition-based electricity consumption forecasting pipeline for
 
 ```text
 .
-├── cpc/
-│   └── environment.yml
-│
+├── demo_prediction.py                  # Self-contained demo (synthetic data)
+├── demo_forecast_next_month.csv        # T+1 demo output
+├── demo_forecast_12_months.csv         # T+12 demo output
+├── requirements.txt
+├── docs/                               # Generated forecast plots
 ├── jupyter-notebook/
-│   └── CPC_Forecast.ipynb
-│
+│   └── CPC_Forecast.ipynb              # Interactive forecasting notebook
 └── main/
-    ├── forecast_t1_13pr_sum.py
-    ├── forecast_t12_13pr_sum.py
-    ├── helper.py
-    └── requirements.txt
+    ├── forecast_t1_13pr_sum.py         # T+1 forecasting script
+    ├── forecast_t12_13pr_sum.py        # T+12 recursive forecasting script
+    └── helper.py                       # Shared utilities
 ```
-
-| Folder / File | Description |
-|---|---|
-| `cpc/environment.yml` | Conda environment setup file |
-| `jupyter-notebook/CPC_Forecast.ipynb` | Notebook demonstrating the forecasting pipeline |
-| `main/forecast_t1_13pr_sum.py` | Script for T+1 forecasting |
-| `main/forecast_t12_13pr_sum.py` | Script for T+12 forecasting |
-| `main/helper.py` | Helper functions |
-| `main/requirements.txt` | Required Python packages |
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Python 3.x
-- Virtual environment is recommended
-
-### Install Dependencies
-
-Using pip:
-
-```bash
-pip install -r main/requirements.txt
-```
-
-Or using Conda:
-
-```bash
-conda env create -f cpc/environment.yml
-```
-
----
-
-## Data Preparation
-
-Prepare historical electricity consumption data for the 13 provinces.
-
-The input data should include at least the following columns:
-
-| Column | Description |
-|---|---|
-| `Date` | Date or month of the observation. `YYYY-MM-DD` is recommended |
-| `Province` | Province name |
-| `Consumption` | Electricity consumption value |
-
-Supported file formats may include CSV or Parquet, depending on the script configuration.
-
----
-
-## Update Data Paths
-
-Before running the scripts, update the input and output paths in:
-
-```text
-main/forecast_t1_13pr_sum.py
-main/forecast_t12_13pr_sum.py
-```
-
-Update the following paths or pass them through command-line arguments:
-
-| Path | Description |
-|---|---|
-| `path_parameter` | Path to the parameter/configuration file |
-| `input_data` | Path to the prepared historical data |
-| `output_path` | Path where prediction results will be saved |
-
----
-
-## Running Predictions
-
-### T+1 Forecast
-
-```bash
-python main/forecast_t1_13pr_sum.py \
-  -f <From_date> \
-  -t <To_date> \
-  -p <Path_to_params> \
-  -i <Path_to_input> \
-  -o <Path_to_output>
-```
-
-### T+12 Forecast
-
-```bash
-python main/forecast_t12_13pr_sum.py \
-  -f <From_date> \
-  -t <To_date> \
-  -p <Path_to_params> \
-  -i <Path_to_input> \
-  -o <Path_to_output>
-```
-
-### Parameters
-
-| Parameter | Description |
-|---|---|
-| `-f`, `From_date` | Start month for forecast, format `MM/YYYY` |
-| `-t`, `To_date` | End month for forecast, format `MM/YYYY` |
-| `-p`, `Path_to_params` | Path to the parameter file for 13 provinces |
-| `-i`, `Path_to_input` | Path to input electricity data |
-| `-o`, `Path_to_output` | Path to save forecast results |
-
-
-### Demo preview
-
-![Forecast sample](docs/forecast_sample.png)
-
-### Example
-
-```bash
-python main/forecast_t1_13pr_sum.py \
-  -f 01/2023 \
-  -t 03/2023 \
-  -p /path/to/params \
-  -i /path/to/input.parquet \
-  -o /path/to/output_t1.parquet
-```
-
-```bash
-python main/forecast_t12_13pr_sum.py \
-  -f 01/2023 \
-  -t 03/2023 \
-  -p /path/to/params \
-  -i /path/to/input.parquet \
-  -o /path/to/output_t12.parquet
-```
-
----
-
-## Output
-
-Prediction results are saved in Parquet format.
-
-### T+1 Output
-
-Main columns:
-
-| Column | Description |
-|---|---|
-| `Province` | Province name |
-| `Year` | Forecast year |
-| `Month` | Forecast month |
-| `y_tr` | Actual value, if available |
-| `y_pr` | Predicted value |
-
-### T+12 Output
-
-Main columns:
-
-| Column | Description |
-|---|---|
-| `Province` | Province name |
-| `Year` | Forecast year |
-| `Month` | Forecast month |
-| `y_tr1` to `y_tr12` | Actual values for each forecast horizon, if available |
-| `y_pr1` to `y_pr12` | Predicted values for each forecast horizon |
-
-The `y_pr1` output from T+12 can also be used as a T+1 forecast.
 
 ---
 
 ## Notes
 
-- Update the input data path each month before running a new forecast.
-- T+12 forecasting uses recursive prediction, so long-horizon errors may increase.
-- This repository is revised from original internal project code from a previous company in 2023.
-- Private information, internal infrastructure paths, and confidential business details have been removed.
+- Update input data paths before each forecast run.
+- T+12 uses recursive forecasting — errors compound over longer horizons (~6% at T+1 → ~14% at T+12).
+- The statistical model depends heavily on matching the forecast year to a historically similar year; correlation-based year selection is critical for accuracy.
+- Cross-province data pooling was tested but did not improve results — each province has distinct consumption patterns.
+- This repository was revised from original internal project code; internal paths and data have been removed.
